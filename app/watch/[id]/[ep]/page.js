@@ -17,6 +17,7 @@ import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams }                     from "next/navigation";
 import { useAuth }                                        from "@/context/AuthContext";
 import { useUserData }                                    from "@/hooks/useUserData";
+import Loading                                            from "@/app/loading";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -91,9 +92,21 @@ export default function WatchPage({ params }) {
   const resumeApplied   = useRef(false);
   const [inWL, setInWL] = useState(false);
   const [wlBusy, setWLBusy] = useState(false);
+  const [alternatives, setAlternatives] = useState([]);
+  const [hideLoader, setHideLoader] = useState(false);
 
   // Sync watchlist state
   useEffect(() => { setInWL(isInWatchlist(animeId)); }, [isInWatchlist, animeId]);
+
+  // Fetch alternatives
+  useEffect(() => {
+    fetch(`/api/info/${encodeURIComponent(id)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.alternatives) setAlternatives(data.alternatives);
+      })
+      .catch(console.error);
+  }, [id]);
 
   // ── Fetch episode list ────────────────────────────────────────────────────
   useEffect(() => {
@@ -130,6 +143,13 @@ export default function WatchPage({ params }) {
       .finally(() => setSrcLoading(false));
   }, [id, ep, mode]);
 
+  // Handle load errors/empty states to remove loader
+  useEffect(() => {
+    if (srcError || (!srcLoading && !activeSource)) {
+      setHideLoader(true);
+    }
+  }, [srcError, srcLoading, activeSource]);
+
   // ── Resume point — seek on video load ────────────────────────────────────
   const handleVideoLoaded = useCallback(() => {
     if (resumeApplied.current || !user) return;
@@ -139,6 +159,15 @@ export default function WatchPage({ params }) {
     }
     resumeApplied.current = true;
   }, [user, getResumePoint, animeId, ep]);
+
+  const handleCanPlay = useCallback(() => {
+    setHideLoader(true);
+    if (videoRef.current && videoRef.current.requestFullscreen) {
+      videoRef.current.requestFullscreen().catch(err => {
+        console.warn("Fullscreen auto-play blocked by browser:", err);
+      });
+    }
+  }, []);
 
   // ── Save progress every 10 s ──────────────────────────────────────────────
   const handleTimeUpdate = useCallback(() => {
@@ -196,6 +225,14 @@ export default function WatchPage({ params }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-void text-parchment select-none">
+      {/* Global Loading Overlay */}
+      <div 
+        className={`fixed inset-0 z-[500] transition-opacity duration-1000 ${
+          hideLoader ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+        }`}
+      >
+        <Loading />
+      </div>
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-30 flex items-center gap-4 px-5 py-3 bg-void/95 border-b border-bark backdrop-blur-sm">
@@ -286,6 +323,7 @@ export default function WatchPage({ params }) {
                 controls
                 autoPlay
                 onLoadedMetadata={handleVideoLoaded}
+                onCanPlay={handleCanPlay}
                 onTimeUpdate={handleTimeUpdate}
                 className="w-full h-full"
                 style={{ maxHeight: "72vh" }}
@@ -338,6 +376,29 @@ export default function WatchPage({ params }) {
                 </button>
               ) : null}
             </div>
+
+            {/* Alternatives section */}
+            {alternatives.length > 0 && (
+              <div className="pt-4 mt-4 border-t border-bark">
+                <span className="font-ui text-[11px] text-fog/50 tracking-wider uppercase mb-2 block">Related Options (If video is wrong)</span>
+                <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                  {alternatives.map((alt) => (
+                    <button
+                      key={alt.id}
+                      onClick={() => {
+                        const qs = new URLSearchParams(searchParams);
+                        // Route to the alternative's id, preserving other query params
+                        router.push(`/watch/${encodeURIComponent(alt.id)}/1?${qs.toString()}`);
+                      }}
+                      className="text-left font-ui text-[12px] px-3 py-2 rounded-sm border border-ink text-fog/70 hover:border-fog/40 hover:text-parchment hover:bg-bark/30 transition-all flex justify-between items-center"
+                    >
+                      <span className="truncate flex-1">{alt.title}</span>
+                      <span className="text-[10px] opacity-60 ml-2 shrink-0">{alt.episodeCount} Eps</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

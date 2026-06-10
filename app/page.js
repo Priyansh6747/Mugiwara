@@ -7,6 +7,7 @@ import {
 } from "@/lib/AllAnime.js";
 import AnimeRow, { SectionHeader } from "@/components/AnimeRow";
 import UserBadge from "@/components/UserBadge";
+import HeroWatchButton from "@/components/HeroWatchButton";
 
 // ─── SVG Icons for UI ─────────────────────────────────────────────────────────
 
@@ -149,15 +150,7 @@ export default async function HomePage() {
     { name: "Adventure", icon: <CompassIcon /> },
   ];
 
-  // Featured collections at the bottom
-  const collections = [
-    { title: "Legends of the Sea", desc: "Sailing the grand blue", bg: "from-blue-950/80 to-slate-900/90", border: "border-blue-900/30" },
-    { title: "The Wano Saga", desc: "Land of the samurai", bg: "from-rose-950/80 to-stone-900/90", border: "border-rose-900/30" },
-    { title: "Shounen Greatness", desc: "Unleash your spirit", bg: "from-orange-950/80 to-amber-950/90", border: "border-orange-900/30" },
-    { title: "Samurai Chronicles", desc: "Path of the blade", bg: "from-red-950/80 to-neutral-900/90", border: "border-red-900/30" },
-    { title: "Epic Battles", desc: "Clash of legends", bg: "from-yellow-950/80 to-orange-950/90", border: "border-yellow-900/30" },
-    { title: "Hidden Treasures", desc: "Wealth, fame, power", bg: "from-emerald-950/80 to-zinc-900/90", border: "border-emerald-900/30" },
-  ];
+
 
   // Determine Featured Hero Anime — prefer One Piece, else top trending
   const all = [...trending, ...popular, ...seasonal];
@@ -236,12 +229,7 @@ export default async function HomePage() {
           </p>
 
           <div className="flex items-center gap-3 pt-2">
-            <a 
-              href={heroWatchUrl} 
-              className="flex items-center gap-2 bg-blood hover:bg-blood/90 text-parchment font-ui text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-[4px] hover:shadow-[0_0_15px_rgba(192,57,43,0.5)] transition-all"
-            >
-              <PlayIcon /> Watch Now
-            </a>
+            <HeroWatchButton anime={heroAnime} />
             <a 
               href="#watchlist"
               className="flex items-center gap-2 bg-transparent hover:bg-parchment/10 text-parchment border border-parchment/40 font-ui text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-[4px] transition-all"
@@ -286,30 +274,6 @@ export default async function HomePage() {
         <AnimeRow items={seasonal}  title={`🌸 ${seasonLabel ? `${seasonLabel} Season` : "Current Season"}`} />
       </div>
 
-      {/* ── Featured Collections ────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <SectionHeader title="Featured Collections" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {collections.map((col, i) => (
-            <a 
-              key={i}
-              href={`/search?q=${col.title}`}
-              className={`relative block p-4 aspect-[16/10] md:aspect-[16/11] rounded-[6px] border ${col.border} bg-gradient-to-br ${col.bg} overflow-hidden group hover:scale-[1.03] hover:border-blood/50 hover:shadow-[0_0_12px_rgba(192,57,43,0.3)] transition-all bg-wood-grain`}
-            >
-              <div className="absolute inset-0 bg-noise pointer-events-none" />
-              
-              <div className="relative z-10 flex flex-col justify-end h-full">
-                <h4 className="font-heading text-xs md:text-sm font-extrabold text-parchment tracking-wide group-hover:text-blood transition-colors leading-tight">
-                  {col.title}
-                </h4>
-                <p className="font-body text-[10px] text-fog/75 mt-1 leading-none">
-                  {col.desc}
-                </p>
-              </div>
-            </a>
-          ))}
-        </div>
-      </section>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
       <footer className="pt-8 border-t border-bark font-meta text-[11px] text-fog/50 flex flex-col sm:flex-row items-center justify-between gap-3">

@@ -142,3 +142,20 @@
   opacity: 0.45;
   filter: blur(0.5px);
 }
+
+/* Custom loading screen progress bar animation */
+@keyframes loading-progress {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.animate-loading-progress {
+  animation: loading-progress 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}

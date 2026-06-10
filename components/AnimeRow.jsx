@@ -64,28 +64,16 @@ const LiftCard = ({ anime, index }) => {
 
     return (
         <div
-            className="shrink-0 snap-start relative"
-            style={{
-                /* keep the fixed widths from the original layout */
-                width: "140px",
-            }}
+            className="shrink-0 snap-start relative w-[140px] md:w-[175px] lg:w-[195px]"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
         >
-            {/* ── md breakpoint widths via inline style fallback ── */}
-            <style>{`
-        @media (min-width: 768px)  { .lift-card { width: 175px !important; } }
-        @media (min-width: 1024px) { .lift-card { width: 195px !important; } }
-      `}</style>
-
             <div
-                className="lift-card relative cursor-pointer rounded-[6px] overflow-visible"
+                className="relative cursor-pointer rounded-[6px] overflow-visible w-full"
                 style={{
-                    width: "inherit",
-                    transform: hovered ? "translateY(-8px) scale(1.08)" : "translateY(0) scale(1)",
+                    transform: hovered ? "translateY(-8px) scale(1.05)" : "translateY(0) scale(1)",
                     transition: "transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)",
                     zIndex: hovered ? 30 : 1,
-                    position: "relative",
                 }}
             >
                 {/* The actual card — unchanged from existing AnimeCard */}
