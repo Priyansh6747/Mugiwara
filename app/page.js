@@ -1,112 +1,213 @@
-"use client";
+import { getHomepageData } from "@/lib/AllAnime.js";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+// ─── Tiny helpers ─────────────────────────────────────────────────────────────
 
-export default function SearchPage() {
-  const router = useRouter();
+function fmtScore(score) {
+  return score != null ? `${score}/100` : "N/A";
+}
 
-  const [query,   setQuery]   = useState("");
-  const [mode,    setMode]    = useState("sub");
-  const [results, setResults] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState(null);
+function fmtStatus(status) {
+  const map = {
+    RELEASING: "Airing",
+    FINISHED: "Finished",
+    NOT_YET_RELEASED: "Upcoming",
+    CANCELLED: "Cancelled",
+    HIATUS: "Hiatus",
+  };
+  return map[status] ?? status ?? "Unknown";
+}
 
-  async function handleSearch(e) {
-    e.preventDefault();
-    if (!query.trim()) return;
+function fmtNextEp(nextAiringEpisode) {
+  if (!nextAiringEpisode) return null;
+  const { airingAt, episode } = nextAiringEpisode;
+  const diff = airingAt * 1000 - Date.now();
+  const days = Math.floor(diff / 86400000);
+  const hrs  = Math.floor((diff % 86400000) / 3600000);
+  return `Ep ${episode} in ${days}d ${hrs}h`;
+}
 
-    setLoading(true);
-    setError(null);
-    setResults(null);
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-    try {
-      const res  = await fetch(`/api/search?q=${encodeURIComponent(query)}&mode=${mode}`);
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error ?? "Search failed");
-      setResults(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function goWatch(showId, epNo = "1") {
-    router.push(`/watch/${encodeURIComponent(showId)}/${epNo}?mode=${mode}`);
-  }
+/** Compact card: image + title + score */
+function AnimeCard({ anime }) {
+  const watchUrl = `/search?q=${encodeURIComponent(anime.displayTitle)}`;
 
   return (
-    <main style={{ fontFamily: "monospace", padding: "2rem", maxWidth: "800px", margin: "0 auto" }}>
-      <h1>Mugiwara — Anime Search</h1>
+    <td style={{ verticalAlign: "top", width: "140px", padding: "4px" }}>
+      <a href={watchUrl} style={{ textDecoration: "none", color: "inherit" }}>
+        {anime.coverImage?.large && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={anime.coverImage.large}
+            alt={anime.displayTitle}
+            width={120}
+            height={170}
+            style={{ display: "block", objectFit: "cover" }}
+          />
+        )}
+        <div style={{ fontSize: "0.8rem", marginTop: "2px", maxWidth: "120px" }}>
+          <strong>{anime.displayTitle}</strong>
+        </div>
+        <div style={{ fontSize: "0.75rem", color: "#555" }}>
+          ★ {fmtScore(anime.averageScore)}
+          {anime.episodes ? ` · ${anime.episodes} eps` : ""}
+        </div>
+      </a>
+    </td>
+  );
+}
 
-      <form onSubmit={handleSearch} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-        <input
-          id="search-input"
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search anime..."
-          style={{ flex: 1, padding: "0.5rem", fontSize: "1rem" }}
-        />
-
-        <select
-          id="mode-select"
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
-          style={{ padding: "0.5rem" }}
-        >
-          <option value="sub">Sub</option>
-          <option value="dub">Dub</option>
-        </select>
-
-        <button
-          id="search-btn"
-          type="submit"
-          disabled={loading}
-          style={{ padding: "0.5rem 1rem" }}
-        >
-          {loading ? "Searching…" : "Search"}
-        </button>
-      </form>
-
-      {error && (
-        <p id="search-error" style={{ color: "red" }}>Error: {error}</p>
-      )}
-
-      {results !== null && results.length === 0 && (
-        <p>No results found for &quot;{query}&quot;.</p>
-      )}
-
-      {results && results.length > 0 && (
-        <table id="results-table" style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Title</th>
-              <th style={{ textAlign: "center", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Episodes</th>
-              <th style={{ textAlign: "center", borderBottom: "1px solid #ccc", padding: "0.4rem" }}>Watch</th>
-            </tr>
-          </thead>
-          <tbody>
-            {results.map((anime) => (
-              <tr key={anime.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: "0.4rem" }}>{anime.title}</td>
-                <td style={{ textAlign: "center", padding: "0.4rem" }}>{anime.episodeCount}</td>
-                <td style={{ textAlign: "center", padding: "0.4rem" }}>
-                  <button
-                    id={`watch-${anime.id}`}
-                    onClick={() => goWatch(anime.id, "1")}
-                    style={{ padding: "0.25rem 0.75rem", cursor: "pointer" }}
-                  >
-                    Ep 1 →
-                  </button>
-                </td>
-              </tr>
+/** Horizontal scrolling row of cards wrapped in a <table> */
+function AnimeRow({ items }) {
+  if (!items?.length) return <p>No data.</p>;
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ borderCollapse: "collapse", whiteSpace: "nowrap" }}>
+        <tbody>
+          <tr>
+            {items.map((anime) => (
+              <AnimeCard key={anime.id} anime={anime} />
             ))}
-          </tbody>
-        </table>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Currently-airing table with next-episode countdown */
+function AiringTable({ items }) {
+  if (!items?.length) return <p>No data.</p>;
+  return (
+    <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "0.85rem" }}>
+      <thead>
+        <tr style={{ borderBottom: "1px solid #ccc" }}>
+          <th style={{ textAlign: "left",   padding: "4px 8px" }}>#</th>
+          <th style={{ textAlign: "left",   padding: "4px 8px" }}>Title</th>
+          <th style={{ textAlign: "center", padding: "4px 8px" }}>Score</th>
+          <th style={{ textAlign: "left",   padding: "4px 8px" }}>Genres</th>
+          <th style={{ textAlign: "left",   padding: "4px 8px" }}>Next Ep</th>
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((anime, i) => {
+          const countdown = fmtNextEp(anime.nextAiringEpisode);
+          return (
+            <tr key={anime.id} style={{ borderBottom: "1px solid #eee" }}>
+              <td style={{ padding: "4px 8px", color: "#999" }}>{i + 1}</td>
+              <td style={{ padding: "4px 8px" }}>
+                <a
+                  href={`/search?q=${encodeURIComponent(anime.displayTitle)}`}
+                  style={{ textDecoration: "none" }}
+                >
+                  {anime.displayTitle}
+                </a>
+              </td>
+              <td style={{ textAlign: "center", padding: "4px 8px" }}>
+                {fmtScore(anime.averageScore)}
+              </td>
+              <td style={{ padding: "4px 8px", color: "#555" }}>
+                {anime.genres.slice(0, 3).join(", ")}
+              </td>
+              <td style={{ padding: "4px 8px", color: "#888" }}>
+                {countdown ?? "—"}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+/** Section header */
+function Section({ title, children }) {
+  return (
+    <section style={{ marginBottom: "2rem" }}>
+      <h2 style={{ borderBottom: "2px solid #333", paddingBottom: "4px", marginBottom: "8px" }}>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+// ─── Page (Server Component) ──────────────────────────────────────────────────
+
+export const metadata = {
+  title: "Mugiwara — Anime",
+  description: "Browse trending, popular, seasonal and currently airing anime.",
+};
+
+export default async function HomePage() {
+  let data;
+  let fetchError = null;
+
+  try {
+    data = await getHomepageData({ perPage: 20 });
+  } catch (err) {
+    fetchError = err.message;
+  }
+
+  const { season, year } = data?.currentSeason ?? {};
+  const seasonLabel = season && year ? `${season.charAt(0) + season.slice(1).toLowerCase()} ${year}` : "";
+
+  return (
+    <main style={{ fontFamily: "monospace", padding: "1.5rem", maxWidth: "1200px", margin: "0 auto" }}>
+      {/* ── Site header ─────────────────────────────────────────────────── */}
+      <header style={{ marginBottom: "1.5rem" }}>
+        <h1 style={{ margin: 0 }}>🏴‍☠️ Mugiwara</h1>
+        <p style={{ margin: "4px 0 0", color: "#666", fontSize: "0.85rem" }}>
+          Anime powered by AniList + AllAnime
+        </p>
+        <nav style={{ marginTop: "8px" }}>
+          <a href="/" style={{ marginRight: "1rem" }}>Home</a>
+          <a href="/search" style={{ marginRight: "1rem" }}>Search</a>
+        </nav>
+      </header>
+
+      {fetchError && (
+        <p style={{ color: "red" }}>
+          Failed to load homepage data: {fetchError}
+        </p>
       )}
+
+      {data && (
+        <>
+          {/* ── Trending ──────────────────────────────────────────────────── */}
+          <Section title="🔥 Trending Now">
+            <AnimeRow items={data.trending} />
+          </Section>
+
+          {/* ── Currently Airing ──────────────────────────────────────────── */}
+          <Section title="📡 Currently Airing">
+            <AiringTable items={data.airing} />
+          </Section>
+
+          {/* ── This Season ───────────────────────────────────────────────── */}
+          <Section title={`🌸 This Season${seasonLabel ? ` — ${seasonLabel}` : ""}`}>
+            <AnimeRow items={data.seasonal} />
+          </Section>
+
+          {/* ── All-time Popular ──────────────────────────────────────────── */}
+          <Section title="👑 All-Time Popular">
+            <AnimeRow items={data.popular} />
+          </Section>
+
+          {/* ── Top Rated ─────────────────────────────────────────────────── */}
+          <Section title="⭐ Top Rated">
+            <AnimeRow items={data.topRated} />
+          </Section>
+        </>
+      )}
+
+      {/* ── Search shortcut ───────────────────────────────────────────────── */}
+      <footer style={{ marginTop: "2rem", borderTop: "1px solid #ddd", paddingTop: "1rem", fontSize: "0.8rem", color: "#888" }}>
+        Data from{" "}
+        <a href="https://anilist.co" target="_blank" rel="noopener noreferrer">AniList</a>
+        {" "}· Streams via{" "}
+        <a href="https://allanime.day" target="_blank" rel="noopener noreferrer">AllAnime</a>
+      </footer>
     </main>
   );
 }
