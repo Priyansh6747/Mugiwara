@@ -137,6 +137,9 @@ function Section({ title, children }) {
 export const metadata = {
   title: "Mugiwara — Anime",
   description: "Browse trending, popular, seasonal and currently airing anime.",
+  icons: {
+    icon: "/Icon.webp",
+  },
 };
 
 export default async function HomePage() {
