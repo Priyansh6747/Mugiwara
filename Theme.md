@@ -25,7 +25,7 @@ The brand sits at the crossroads of **brutalism** (raw, unapologetic hierarchy) 
 | `--color-parchment` | Aged Parchment | `#E8D5B0` | Primary body text, readable labels |
 | `--color-fog` | Fog White | `#A89880` | Secondary text, metadata, episode numbers |
 | `--color-ink` | Sumi Ink | `#4A3728` | Subtle texture overlays, brushstroke dividers |
-| `--color-gold` | Tarnished Gold | `#C9A84C` | Premium/Captain tier accents, logo kanji |
+| `--color-gold` | Tarnished Gold | `#C9A84C` | Display accents, logo kanji |
 | `--color-error` | Error Red | `#FF2D20` | Error states (replaces Sekiro's 死 with 錯) |
 | `--color-caution` | Caution Amber | `#F0A500` | Warning states (maps to Sekiro's yellow alert indicator) |
 
@@ -107,7 +107,6 @@ Anime cards use a `box-shadow: inset 0 0 60px rgba(13, 10, 8, 0.5)` vignette to 
 - Items: 48px tall, 16px horizontal padding
 - Active state: red brushstroke highlight behind text (use an SVG or `::before` pseudo with a hand-drawn rectangle mask)
 - Hover: text shifts to `--color-parchment`, icon gains blood glow
-- Bottom section: premium upsell in parchment/gold — "The Grand Line Pass"
 
 ### Hero Banner
 - Full-bleed image with heavy left-side gradient fade to `--color-void`
@@ -235,7 +234,6 @@ The UI speaks like a sea-weathered captain: direct, unhurried, never customer-se
 | Error | "The path is blocked. Return and try again." | "Something went wrong. Please refresh." |
 | Loading | "Setting sail…" | "Loading, please wait…" |
 | Add to collection | "Claimed." | "Added to your list!" |
-| Premium upsell | "Beyond the horizon, further voyages await." | "Upgrade for more content!" |
 | 404 | "This sea chart leads nowhere." | "Page not found." |
 
 **Tone rules:**

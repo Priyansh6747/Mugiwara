@@ -6,6 +6,7 @@ import {
   getCurrentSeason,
 } from "@/lib/AllAnime.js";
 import AnimeRow, { SectionHeader } from "@/components/AnimeRow";
+import UserBadge from "@/components/UserBadge";
 
 // ─── SVG Icons for UI ─────────────────────────────────────────────────────────
 
@@ -198,15 +199,7 @@ export default async function HomePage() {
         </form>
 
         {/* User profile */}
-        <div className="flex items-center gap-3 bg-bark/30 border border-ink px-4 py-1.5 rounded-[2px] bg-noise select-none">
-          <div className="text-right">
-            <div className="font-ui text-xs font-semibold text-parchment leading-tight">Clan Mugiwara</div>
-            <div className="font-meta text-[10px] text-gold tracking-wider leading-none mt-0.5">Captain</div>
-          </div>
-          <div className="w-8 h-8 rounded-full border border-gold bg-void flex items-center justify-center text-xs select-none">
-            ☠️
-          </div>
-        </div>
+        <UserBadge />
       </header>
 
       {fetchError && (

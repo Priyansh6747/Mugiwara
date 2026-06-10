@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import AuthModal from "@/components/AuthModal";
 
 const MugiwaraLogo = () => (
   <svg viewBox="0 0 100 100" className="w-12 h-12 text-[#E8D5B0] shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -85,6 +88,14 @@ const HourglassIcon = () => (
   </svg>
 );
 
+const LogoutIcon = () => (
+  <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9,21 H5 a2,2 0 0 1 -2,-2 V5 a2,2 0 0 1 2,-2 h4"/>
+    <polyline points="16,17 21,12 16,7"/>
+    <line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+);
+
 const ToriiGraphic = () => (
   <svg viewBox="0 0 120 80" className="w-24 h-16 mx-auto opacity-10 text-[#E8D5B0]" fill="none" stroke="currentColor" strokeWidth="1.5">
     {/* Curved top beam */}
@@ -102,97 +113,162 @@ const ToriiGraphic = () => (
   </svg>
 );
 
+// ── Avatar helper ─────────────────────────────────────────────────────────────
+
+function UserAvatar({ user }) {
+  if (user.photoURL) {
+    return (
+      <img
+        src={user.photoURL}
+        alt={user.displayName ?? "User"}
+        className="w-8 h-8 rounded-full border border-gold object-cover"
+      />
+    );
+  }
+  const initials = (user.displayName ?? user.email ?? "?")
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <div className="w-8 h-8 rounded-full border border-gold bg-blood/20 flex items-center justify-center font-ui text-xs font-bold text-gold select-none">
+      {initials}
+    </div>
+  );
+}
+
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, loading, signOut } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const menuItems = [
-    { name: "Home", href: "/", icon: ShipWheelIcon },
-    { name: "Explore", href: "/search", icon: CompassIcon },
-    { name: "Fleet", href: "#fleet", icon: ShipIcon },
-    { name: "Collections", href: "#collections", icon: ScrollIcon },
-    { name: "Journey", href: "#journey", icon: ToriiIcon },
-    { name: "Genres", href: "#genres", icon: MaskIcon },
-    { name: "Watchlist", href: "#watchlist", icon: BookmarkIcon },
-    { name: "Recently Watched", href: "#recent", icon: HourglassIcon },
+    { name: "Home",             href: "/",           icon: ShipWheelIcon },
+    { name: "Explore",          href: "/search",     icon: CompassIcon },
+    { name: "Fleet",            href: "#fleet",      icon: ShipIcon },
+    { name: "Collections",      href: "#collections",icon: ScrollIcon },
+    { name: "Journey",          href: "#journey",    icon: ToriiIcon },
+    { name: "Genres",           href: "#genres",     icon: MaskIcon },
+    { name: "Watchlist",        href: "#watchlist",  icon: BookmarkIcon },
+    { name: "Recently Watched", href: "#recent",     icon: HourglassIcon },
   ];
 
   return (
-    <aside className="w-60 bg-ash border-r border-bark flex flex-col justify-between h-screen sticky top-0 shrink-0 select-none bg-wood-grain z-50">
-      {/* Brand Logo & Name */}
-      <div className="pt-6 px-6 pb-4">
-        <Link href="/" className="flex items-center gap-3 group">
-          <MugiwaraLogo />
-          <div>
-            <div className="font-display text-xl font-bold tracking-wider text-parchment leading-none group-hover:text-blood transition-colors">
-              MUGIWARA
+    <>
+      <aside className="w-60 bg-ash border-r border-bark flex flex-col justify-between h-screen sticky top-0 shrink-0 select-none bg-wood-grain z-50">
+        {/* Brand Logo & Name */}
+        <div className="pt-6 px-6 pb-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <MugiwaraLogo />
+            <div>
+              <div className="font-display text-xl font-bold tracking-wider text-parchment leading-none group-hover:text-blood transition-colors">
+                MUGIWARA
+              </div>
+              <div className="font-ui text-[10px] tracking-[0.25em] text-gold mt-1">
+                麦わらの道
+              </div>
             </div>
-            <div className="font-ui text-[10px] tracking-[0.25em] text-gold mt-1">
-              麦わらの道
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      {/* Navigation List */}
-      <nav className="flex-1 py-4 overflow-y-auto px-3 space-y-1">
-        {menuItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`relative flex items-center gap-3 h-11 px-3 rounded-sm font-ui text-[13px] tracking-wide transition-all group overflow-hidden ${
-                isActive
-                  ? "text-parchment font-semibold"
-                  : "text-fog/70 hover:text-parchment"
-              }`}
-            >
-              {/* Brushstroke indicator background */}
-              {isActive && (
-                <div 
-                  className="absolute inset-0 bg-blood/10 -z-10 animate-fade-in"
-                  style={{
-                    borderLeft: "3px solid #C0392B",
-                    backgroundImage: "linear-gradient(90deg, rgba(192, 57, 43, 0.15), transparent)",
-                  }}
-                />
-              )}
-
-              <span className={`transition-all duration-300 ${
-                isActive ? "text-blood drop-shadow-[0_0_8px_rgba(192,57,43,0.6)]" : "text-fog/60 group-hover:text-blood group-hover:drop-shadow-[0_0_4px_rgba(192,57,43,0.4)]"
-              }`}>
-                <Icon />
-              </span>
-
-              <span className="relative z-10">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Premium and Illustration Footer */}
-      <div className="p-4 border-t border-bark bg-void/50">
-        <div className="mb-4">
-          <ToriiGraphic />
-        </div>
-        
-        <div className="bg-bark/40 border border-ink p-3 rounded-sm text-center">
-          <div className="font-heading text-xs tracking-wider text-gold font-bold">
-            The Grand Line Pass
-          </div>
-          <div className="font-body text-[11px] text-fog/80 mt-1 leading-normal">
-            Unlock exclusive voyages beyond the horizon.
-          </div>
-          <Link 
-            href="#premium" 
-            className="inline-block mt-2.5 font-ui text-[11px] text-blood hover:text-gold transition-colors font-bold uppercase tracking-wider"
-          >
-            Go Premium &rarr;
           </Link>
         </div>
-      </div>
-    </aside>
+
+        {/* Navigation List */}
+        <nav className="flex-1 py-4 overflow-y-auto px-3 space-y-1">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`relative flex items-center gap-3 h-11 px-3 rounded-sm font-ui text-[13px] tracking-wide transition-all group overflow-hidden ${
+                  isActive
+                    ? "text-parchment font-semibold"
+                    : "text-fog/70 hover:text-parchment"
+                }`}
+              >
+                {/* Brushstroke indicator background */}
+                {isActive && (
+                  <div
+                    className="absolute inset-0 bg-blood/10 -z-10 animate-fade-in"
+                    style={{
+                      borderLeft: "3px solid #C0392B",
+                      backgroundImage: "linear-gradient(90deg, rgba(192, 57, 43, 0.15), transparent)",
+                    }}
+                  />
+                )}
+
+                <span className={`transition-all duration-300 ${
+                  isActive ? "text-blood drop-shadow-[0_0_8px_rgba(192,57,43,0.6)]" : "text-fog/60 group-hover:text-blood group-hover:drop-shadow-[0_0_4px_rgba(192,57,43,0.4)]"
+                }`}>
+                  <Icon />
+                </span>
+
+                <span className="relative z-10">{item.name}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-bark bg-void/50 space-y-4">
+          <div>
+            <ToriiGraphic />
+          </div>
+
+          {/* ── User section ── */}
+          {loading ? (
+            /* Skeleton */
+            <div className="h-10 rounded-sm bg-bark/40 animate-pulse" />
+          ) : user ? (
+            /* Logged in */
+            <div className="bg-bark/40 border border-ink rounded-sm p-3 flex items-center gap-2.5">
+              <UserAvatar user={user} />
+              <div className="flex-1 min-w-0">
+                <div className="font-ui text-[12px] font-semibold text-parchment truncate leading-tight">
+                  {user.displayName ?? "Crew Member"}
+                </div>
+                <div className="font-meta text-[10px] text-fog/60 truncate leading-none mt-0.5">
+                  {user.email}
+                </div>
+              </div>
+              <button
+                onClick={signOut}
+                id="sidebar-signout-btn"
+                title="Sign out"
+                className="text-fog/40 hover:text-blood transition-colors shrink-0"
+              >
+                <LogoutIcon />
+              </button>
+            </div>
+          ) : (
+            /* Logged out */
+            <div className="bg-bark/40 border border-ink p-3 rounded-sm text-center space-y-2">
+              <div className="font-heading text-xs tracking-wider text-gold font-bold">
+                Join the Crew
+              </div>
+              <div className="font-body text-[11px] text-fog/80 leading-normal">
+                Sign in to track your voyages and save your collection.
+              </div>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                id="sidebar-login-btn"
+                className="w-full mt-1 font-ui text-[11px] text-blood hover:text-gold transition-colors font-bold uppercase tracking-wider"
+              >
+                Sign In / Join →
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
+    </>
   );
 }
