@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { useUserData } from "@/hooks/useUserData";
+import { buildWatchUrl, buildWatchUrlFromContinue } from "@/lib/watchUrl";
+import { prefetchSkipTimes } from "@/lib/skipTimesCache";
 
 /* ─── Icons ─── */
 const StarIcon = ({ className = "w-3 h-3" }) => (
@@ -33,12 +37,20 @@ const LoaderIcon = () => (
 
 export default function AnimeCard({ anime }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { getContinueEntry } = useUserData();
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
 
+  const anilistId = anime.animeId ?? anime.id;
   const totalEp = anime.episodes ?? anime.nextAiringEpisode?.episode ?? 0;
-  const href = `/search?q=${encodeURIComponent(anime.displayTitle)}`;
+  const searchHref = `/search?q=${encodeURIComponent(anime.displayTitle)}`;
+  const savedEntry = user ? getContinueEntry(anilistId) : null;
+  const directEntry = anime.continueEntry ?? savedEntry;
+  const href = directEntry?.animeId
+    ? buildWatchUrlFromContinue(directEntry)
+    : searchHref;
 
   const imgRef = (node) => {
     if (!node) return;
@@ -55,36 +67,40 @@ export default function AnimeCard({ anime }) {
     if (e.button === 1 || e.ctrlKey || e.metaKey || e.shiftKey) return;
     e.preventDefault();
 
+    if (directEntry?.animeId) {
+      prefetchSkipTimes(directEntry.animeId, directEntry.episode ?? 1);
+      router.push(buildWatchUrlFromContinue(directEntry));
+      return;
+    }
+
     if (isResolving) return;
     setIsResolving(true);
 
     try {
+
       const qs = new URLSearchParams({
-        alid: String(anime.id),
+        alid: String(anilistId),
         q: anime.displayTitle,
-        mode: "sub"
+        mode: "sub",
       });
+      if (anime.malId != null) {
+        qs.set("malId", String(anime.malId));
+      }
       const res = await fetch(`/api/resolve?${qs.toString()}`);
       const data = await res.json();
       
       if (!res.ok) throw new Error(data.error || "Failed to resolve");
 
-      // Construct watch URL metadata
-      const wqs = new URLSearchParams({
-        mode: "sub",
+      router.push(buildWatchUrl({
+        animeId: data.id,
+        anilistId,
         title: anime.displayTitle,
-        aid: data.id,
-        alid: String(anime.id)
-      });
-      if (anime.coverImage?.large) {
-        wqs.set("cover", anime.coverImage.large);
-      }
-
-      router.push(`/watch/${encodeURIComponent(data.id)}/1?${wqs.toString()}`);
+        coverImage: anime.coverImage?.large,
+      }));
     } catch (err) {
       console.error(err);
       // Fallback to normal search page if error
-      router.push(href);
+      router.push(searchHref);
     } finally {
       setIsResolving(false);
     }
@@ -173,7 +189,9 @@ export default function AnimeCard({ anime }) {
           {anime.displayTitle}
         </a>
         <p className="font-meta text-[10px] text-fog/50 leading-tight">
-          {anime.status === "RELEASING" && anime.nextAiringEpisode ? (
+          {anime.continueEpisode ? (
+            <span className="text-ember">Ep {anime.continueEpisode} · Continue</span>
+          ) : anime.status === "RELEASING" && anime.nextAiringEpisode ? (
             <span className="text-ember">Ep {anime.nextAiringEpisode.episode} soon</span>
           ) : anime.status === "FINISHED" ? (
             <span>Finished · {anime.format ?? "TV"}</span>

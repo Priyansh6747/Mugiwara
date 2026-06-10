@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { useUserData } from "@/hooks/useUserData";
+import { buildWatchUrl, buildWatchUrlFromContinue } from "@/lib/watchUrl";
+import { prefetchSkipTimes } from "@/lib/skipTimesCache";
 
 const PlayIcon = () => (
   <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" stroke="currentColor" strokeWidth="2">
@@ -18,41 +22,51 @@ const LoaderIcon = () => (
 
 export default function HeroWatchButton({ anime }) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { getContinueEntry } = useUserData();
   const [isResolving, setIsResolving] = useState(false);
-  const href = `/search?q=${encodeURIComponent(anime.displayTitle)}`;
+  const searchHref = `/search?q=${encodeURIComponent(anime.displayTitle)}`;
+  const anilistId = anime.animeId ?? anime.id ?? anime.anilistId;
+  const savedEntry = user ? getContinueEntry(anilistId) : null;
+  const href = savedEntry?.animeId
+    ? buildWatchUrlFromContinue(savedEntry)
+    : searchHref;
 
   const handleClick = async (e) => {
     if (e.button === 1 || e.ctrlKey || e.metaKey || e.shiftKey) return;
     e.preventDefault();
 
+    if (savedEntry?.animeId) {
+      prefetchSkipTimes(savedEntry.animeId, savedEntry.episode ?? 1);
+      router.push(buildWatchUrlFromContinue(savedEntry));
+      return;
+    }
+
     if (isResolving) return;
     setIsResolving(true);
 
     try {
+
       const qs = new URLSearchParams({
-        alid: String(anime.id || anime.anilistId || ""),
+        alid: String(anilistId ?? ""),
         q: anime.displayTitle,
-        mode: "sub"
+        mode: "sub",
       });
+      if (anime.malId != null) qs.set("malId", String(anime.malId));
       const res = await fetch(`/api/resolve?${qs.toString()}`);
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || "Failed to resolve");
 
-      const wqs = new URLSearchParams({
-        mode: "sub",
+      router.push(buildWatchUrl({
+        animeId: data.id,
+        anilistId,
         title: anime.displayTitle,
-        aid: data.id,
-        alid: String(anime.id || anime.anilistId || "")
-      });
-      if (anime.coverImage?.large) {
-        wqs.set("cover", anime.coverImage.large);
-      }
-
-      router.push(`/watch/${encodeURIComponent(data.id)}/1?${wqs.toString()}`);
+        coverImage: anime.coverImage?.large,
+      }));
     } catch (err) {
       console.error(err);
-      router.push(href);
+      router.push(searchHref);
     } finally {
       setIsResolving(false);
     }
@@ -64,8 +78,12 @@ export default function HeroWatchButton({ anime }) {
       onClick={handleClick}
       className="flex items-center gap-2 bg-blood hover:bg-blood/90 text-parchment font-ui text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-[4px] hover:shadow-[0_0_15px_rgba(192,57,43,0.5)] transition-all"
     >
-      {isResolving ? <LoaderIcon /> : <PlayIcon />} 
-      {isResolving ? "Loading..." : "Watch Now"}
+      {isResolving ? <LoaderIcon /> : <PlayIcon />}
+      {isResolving
+        ? "Loading..."
+        : savedEntry
+          ? "Continue"
+          : "Watch Now"}
     </a>
   );
 }

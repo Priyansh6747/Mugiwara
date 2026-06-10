@@ -77,9 +77,16 @@ export function useUserData() {
   /** Get the resume timestamp for a specific episode (returns 0 if not found) */
   const getResumePoint = useCallback((animeId, episode) => {
     const entry = (data?.continueWatching ?? []).find(
-      (e) => e.animeId === animeId && e.episode === episode
+      (e) => e.animeId === animeId && Number(e.episode) === Number(episode)
     );
     return entry?.timestamp ?? 0;
+  }, [data]);
+
+  /** Find a continue-watching entry by AniList ID */
+  const getContinueEntry = useCallback((anilistId) => {
+    return (data?.continueWatching ?? []).find(
+      (e) => Number(e.anilistId) === Number(anilistId)
+    );
   }, [data]);
 
   return {
@@ -95,5 +102,6 @@ export function useUserData() {
     isInWatchlist,
     saveProgress,
     getResumePoint,
+    getContinueEntry,
   };
 }

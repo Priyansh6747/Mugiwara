@@ -3,7 +3,7 @@
  *
  * GET    — list continue-watching entries for the current user
  * POST   — upsert a continue-watching entry (called from the video player)
- * DELETE — remove a specific entry  (body: { animeId, episode })
+ * DELETE — remove an entry  (body: { animeId })
  */
 
 import { NextResponse }                                   from "next/server";
@@ -59,13 +59,13 @@ export async function POST(req) {
 export async function DELETE(req) {
   try {
     const { uid } = await requireSession(req);
-    const { animeId, episode } = await req.json();
+    const { animeId } = await req.json();
 
-    if (!animeId || episode == null) {
-      return NextResponse.json({ error: "animeId and episode are required" }, { status: 400 });
+    if (!animeId) {
+      return NextResponse.json({ error: "animeId is required" }, { status: 400 });
     }
 
-    await removeContinueWatching(uid, animeId, episode);
+    await removeContinueWatching(uid, animeId);
     return NextResponse.json({ removed: true });
   } catch (res) {
     if (res instanceof Response) return res;

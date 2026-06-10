@@ -8,6 +8,7 @@ import {
 import AnimeRow, { SectionHeader } from "@/components/AnimeRow";
 import UserBadge from "@/components/UserBadge";
 import HeroWatchButton from "@/components/HeroWatchButton";
+import ContinueWatchingRow from "@/components/ContinueWatchingRow";
 
 // ─── SVG Icons for UI ─────────────────────────────────────────────────────────
 
@@ -268,6 +269,7 @@ export default async function HomePage() {
 
       {/* ── Dynamic Content Sections ────────────────────────────────────── */}
       <div className="space-y-10">
+        <ContinueWatchingRow />
         <AnimeRow items={trending}  title="🔥 Trending Now" />
         <AnimeRow items={popular}   title="👑 All-Time Popular" />
         <AnimeRow items={topRated}  title="⭐ Top Rated" />

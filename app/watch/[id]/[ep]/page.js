@@ -7,8 +7,9 @@
  *
  * Data flow:
  *   1. mount → GET /api/episodes/[id]                           → episode list
- *   2. mount → GET /api/source?showId=&ep=&mode=&quality=list   → all sources
- *   3. If user is logged in → seek to saved resume point
+ *   2. mount → GET /api/source?…&quality=list → proxied /api/stream URLs only
+ *   3. On start → seek to max(AniSkip intro end, URL ?t= or saved resume timestamp)
+ *      Skip times are prefetched on continue-watching clicks and fetched in parallel on mount.
  *   4. Every 10 s during playback → POST /api/user/continue-watching (debounced)
  *   5. On ≥ 90 % completion → episode auto-moves to history via the API
  */
@@ -18,6 +19,7 @@ import { useRouter, useSearchParams }                     from "next/navigation"
 import { useAuth }                                        from "@/context/AuthContext";
 import { useUserData }                                    from "@/hooks/useUserData";
 import Loading                                            from "@/app/loading";
+import { getCachedSkipTimes, prefetchSkipTimes }          from "@/lib/skipTimesCache";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +65,7 @@ const SAVE_INTERVAL_MS = 10_000;
 export default function WatchPage({ params }) {
   const { id, ep }   = use(params);
   const searchParams = useSearchParams();
-  const mode         = searchParams.get("mode") ?? "sub";
+  const mode         = searchParams.get("mode") === "dub" ? "dub" : "sub";
   const router       = useRouter();
 
   const { user }                                        = useAuth();
@@ -73,7 +75,8 @@ export default function WatchPage({ params }) {
   const title      = searchParams.get("title")  ?? "";
   const animeId    = searchParams.get("aid")    ?? id;   // AllAnime ID
   const anilistId  = Number(searchParams.get("alid") ?? 0);
-  const coverImage = searchParams.get("cover")  ?? "";
+  const coverImage    = searchParams.get("cover") ?? "";
+  const urlTimestamp  = Number(searchParams.get("t") ?? 0);
 
   // ── Episode list ──────────────────────────────────────────────────────────
   const [episodes,  setEpisodes]  = useState([]);
@@ -88,8 +91,11 @@ export default function WatchPage({ params }) {
 
   // ── Player state ──────────────────────────────────────────────────────────
   const videoRef        = useRef(null);
-  const lastSavedRef    = useRef(0);
-  const resumeApplied   = useRef(false);
+  const hlsRef          = useRef(null);
+  const lastSavedRef      = useRef(0);
+  const resumeApplied     = useRef(false);
+  const metadataReadyRef  = useRef(false);
+  const skipTimesRef      = useRef(null); // null = loading, object = settled
   const [inWL, setInWL] = useState(false);
   const [wlBusy, setWLBusy] = useState(false);
   const [alternatives, setAlternatives] = useState([]);
@@ -150,15 +156,94 @@ export default function WatchPage({ params }) {
     }
   }, [srcError, srcLoading, activeSource]);
 
-  // ── Resume point — seek on video load ────────────────────────────────────
-  const handleVideoLoaded = useCallback(() => {
-    if (resumeApplied.current || !user) return;
-    const t = getResumePoint(animeId, Number(ep));
-    if (t > 5 && videoRef.current) {
-      videoRef.current.currentTime = t;
+  // ── Attach proxied stream (/api/stream) — never load upstream CDN URLs ─────
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !activeSource?.url) return;
+
+    let cancelled = false;
+
+    async function attach() {
+      if (activeSource.type === "m3u8") {
+        const { default: Hls } = await import("hls.js");
+        if (cancelled) return;
+
+        if (Hls.isSupported()) {
+          const hls = new Hls({ enableWorker: true });
+          hlsRef.current = hls;
+          hls.loadSource(activeSource.url);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.ERROR, (_, data) => {
+            if (data.fatal) console.error("[hls]", data.type, data.details);
+          });
+        } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = activeSource.url;
+        } else {
+          setSrcError("HLS playback is not supported in this browser.");
+        }
+        return;
+      }
+
+      video.src = activeSource.url;
+    }
+
+    attach().catch((err) => {
+      console.error(err);
+      setSrcError(err.message);
+    });
+
+    return () => {
+      cancelled = true;
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [activeSource]);
+
+  // ── Start position: max(AniSkip intro end, continue-watching timestamp) ───
+  const applyStartSeek = useCallback(() => {
+    if (resumeApplied.current || !metadataReadyRef.current || !videoRef.current) return;
+    if (skipTimesRef.current === null) return;
+
+    const resume   = urlTimestamp > 0
+      ? urlTimestamp
+      : (user ? getResumePoint(animeId, Number(ep)) : 0);
+    const introEnd = skipTimesRef.current?.op?.endTime ?? 0;
+    const seekTo   = Math.max(introEnd, resume);
+
+    if (seekTo > 5) {
+      videoRef.current.currentTime = seekTo;
     }
     resumeApplied.current = true;
-  }, [user, getResumePoint, animeId, ep]);
+  }, [user, getResumePoint, animeId, ep, urlTimestamp]);
+
+  useEffect(() => {
+    resumeApplied.current    = false;
+    metadataReadyRef.current = false;
+
+    const cached = getCachedSkipTimes(id, ep);
+    if (cached) {
+      skipTimesRef.current = cached;
+      applyStartSeek();
+      return;
+    }
+
+    skipTimesRef.current = null;
+    let cancelled = false;
+    prefetchSkipTimes(id, ep).then((data) => {
+      if (cancelled) return;
+      skipTimesRef.current = data;
+      applyStartSeek();
+    });
+
+    return () => { cancelled = true; };
+  }, [id, ep, applyStartSeek]);
+
+  const handleVideoLoaded = useCallback(() => {
+    metadataReadyRef.current = true;
+    applyStartSeek();
+  }, [applyStartSeek]);
 
   const handleCanPlay = useCallback(() => {
     setHideLoader(true);
@@ -211,10 +296,10 @@ export default function WatchPage({ params }) {
     }
   }
 
-  // ── Mode toggle ───────────────────────────────────────────────────────────
-  function toggleMode() {
-    const next = mode === "sub" ? "dub" : "sub";
-    const qs   = new URLSearchParams(searchParams);
+  // ── Sub / Dub ─────────────────────────────────────────────────────────────
+  function setMode(next) {
+    if (next === mode) return;
+    const qs = new URLSearchParams(searchParams);
     qs.set("mode", next);
     router.push(`/watch/${encodeURIComponent(id)}/${ep}?${qs}`);
   }
@@ -257,16 +342,6 @@ export default function WatchPage({ params }) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Sub / Dub toggle */}
-          <button
-            onClick={toggleMode}
-            id="watch-mode-toggle"
-            className="flex items-center gap-1.5 bg-bark/40 border border-ink hover:border-blood text-fog/80 hover:text-parchment font-ui text-[11px] tracking-wider uppercase px-3 py-1.5 rounded-sm transition-all"
-          >
-            {mode === "sub" ? <SubIcon /> : <DubIcon />}
-            {mode === "sub" ? "Sub" : "Dub"}
-          </button>
-
           {/* Watchlist toggle — only when logged in */}
           {user && (
             <button
@@ -294,7 +369,42 @@ export default function WatchPage({ params }) {
         <div className="flex-1 flex flex-col min-w-0">
 
           {/* Video */}
-          <div className="relative bg-black w-full" style={{ aspectRatio: "16/9", maxHeight: "72vh" }}>
+          <div className="relative bg-black w-full group/player" style={{ aspectRatio: "16/9", maxHeight: "72vh" }}>
+            {/* Sub / Dub — on player */}
+            <div
+              id="watch-mode-picker"
+              className="absolute top-3 right-3 z-20 flex items-center gap-1 bg-void/85 backdrop-blur-sm border border-bark/60 rounded-sm p-0.5"
+            >
+              <button
+                type="button"
+                onClick={() => setMode("sub")}
+                disabled={srcLoading}
+                aria-pressed={mode === "sub"}
+                className={`flex items-center gap-1 font-ui text-[11px] tracking-wider uppercase px-2.5 py-1.5 rounded-sm transition-all disabled:opacity-50 ${
+                  mode === "sub"
+                    ? "bg-blood/25 border border-blood/60 text-parchment"
+                    : "border border-transparent text-fog/70 hover:text-parchment"
+                }`}
+              >
+                <SubIcon />
+                Sub
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("dub")}
+                disabled={srcLoading}
+                aria-pressed={mode === "dub"}
+                className={`flex items-center gap-1 font-ui text-[11px] tracking-wider uppercase px-2.5 py-1.5 rounded-sm transition-all disabled:opacity-50 ${
+                  mode === "dub"
+                    ? "bg-blood/25 border border-blood/60 text-parchment"
+                    : "border border-transparent text-fog/70 hover:text-parchment"
+                }`}
+              >
+                <DubIcon />
+                Dub
+              </button>
+            </div>
+
             {srcLoading && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <LoaderIcon />
@@ -319,9 +429,9 @@ export default function WatchPage({ params }) {
                 id="anime-player"
                 ref={videoRef}
                 key={activeSource.url}
-                src={activeSource.url}
                 controls
                 autoPlay
+                playsInline
                 onLoadedMetadata={handleVideoLoaded}
                 onCanPlay={handleCanPlay}
                 onTimeUpdate={handleTimeUpdate}
@@ -333,6 +443,37 @@ export default function WatchPage({ params }) {
 
           {/* ── Below player ─────────────────────────────────────────────── */}
           <div className="px-5 py-4 space-y-4 border-t border-bark bg-ash/60">
+
+            {/* Sub / Dub */}
+            <div className="flex items-center gap-2 flex-wrap" id="watch-audio-picker">
+              <span className="font-ui text-[11px] text-fog/50 tracking-wider uppercase">Audio</span>
+              <button
+                type="button"
+                onClick={() => setMode("sub")}
+                disabled={srcLoading}
+                className={`flex items-center gap-1.5 font-ui text-[11px] px-2.5 py-1 rounded-sm border transition-all tracking-wide ${
+                  mode === "sub"
+                    ? "bg-blood/20 border-blood text-parchment"
+                    : "bg-void border-ink text-fog/70 hover:border-fog/40 hover:text-parchment"
+                }`}
+              >
+                <SubIcon />
+                Sub
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("dub")}
+                disabled={srcLoading}
+                className={`flex items-center gap-1.5 font-ui text-[11px] px-2.5 py-1 rounded-sm border transition-all tracking-wide ${
+                  mode === "dub"
+                    ? "bg-blood/20 border-blood text-parchment"
+                    : "bg-void border-ink text-fog/70 hover:border-fog/40 hover:text-parchment"
+                }`}
+              >
+                <DubIcon />
+                Dub
+              </button>
+            </div>
 
             {/* Quality picker */}
             {sources.length > 0 && (

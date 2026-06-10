@@ -1,21 +1,14 @@
 import { getVideoSources, selectSource } from "@/lib/AllAnime.js";
+import { toClientSources } from "@/lib/streamProxy";
 
 /**
  * GET /api/source?showId=xxx&ep=1&mode=sub&quality=best
  *
- * Full resolution chain:
- *   fetchProviderEntries → decodeProviderId → fetchLinksFromProvider → selectSource
- *
- * Returns: { url, quality, type, referer }
- *   - url      → direct video URL (m3u8 or mp4)
- *   - quality  → e.g. "1080p"
- *   - type     → "m3u8" | "mp4"
- *   - referer  → Referer header the player must send with requests
- *
- * Pass quality=list to get the full sorted source list instead of a single pick.
+ * Resolves providers server-side and returns same-origin proxy URLs only.
+ * Client shape: { url, quality, type } — url is always /api/stream?t=…
  */
 export async function GET(request) {
-  const { searchParams } = request.nextUrl;
+  const { searchParams, origin } = request.nextUrl;
 
   const showId  = searchParams.get("showId");
   const ep      = searchParams.get("ep");
@@ -36,13 +29,15 @@ export async function GET(request) {
       return Response.json({ error: "No sources found" }, { status: 404 });
     }
 
-    // Return the full list so the client can pick / display all options
+    const proxied = toClientSources(sources, origin);
+
     if (quality === "list") {
-      return Response.json(sources);
+      return Response.json(proxied);
     }
 
     const picked = selectSource(sources, quality);
-    return Response.json(picked);
+    const client = toClientSources([picked], origin)[0];
+    return Response.json(client);
   } catch (err) {
     console.error("[/api/source]", err);
     return Response.json({ error: err.message }, { status: 502 });

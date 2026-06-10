@@ -1,16 +1,18 @@
 import { adminDb } from "@/lib/firebaseAdmin";
-import { searchAnime } from "@/lib/AllAnime";
+import { searchAnime, resolveAllAnimeShowId } from "@/lib/AllAnime";
 import { Timestamp } from "firebase-admin/firestore";
 
 /**
- * GET /api/resolve?alid=123&q=Naruto
- * Resolves an anilist ID to an AllAnime ID.
- * 1. Checks Firebase AnimeData cache.
- * 2. If not found, searches AllAnime, picks the top result, caches it and alternatives.
+ * GET /api/resolve?alid=15125&malId=21&q=One+Piece
+ * Resolves an AniList animeId → AllAnime show _id.
+ * 1. Checks Firebase AnimeData cache (keyed by anilistId).
+ * 2. Title search on AllAnime, disambiguated by malId when present.
+ * 3. Falls back to plain title search for alternatives list.
  */
 export async function GET(request) {
   const { searchParams } = request.nextUrl;
   const anilistId = searchParams.get("alid");
+  const malId = searchParams.get("malId");
   const q = searchParams.get("q")?.trim();
   const mode = searchParams.get("mode") ?? "sub";
 
@@ -20,21 +22,49 @@ export async function GET(request) {
 
   try {
     if (anilistId) {
-      const snap = await adminDb.collection("AnimeData")
-        .where("anilistId", "==", Number(anilistId))
-        .limit(1)
-        .get();
+      try {
+        const snap = await adminDb.collection("AnimeData")
+          .where("anilistId", "==", Number(anilistId))
+          .limit(1)
+          .get();
 
-      if (!snap.empty) {
-        const doc = snap.docs[0].data();
-        return Response.json({
-          id: doc.animeId,
-          alternatives: doc.alternatives || []
-        });
+        if (!snap.empty) {
+          const doc = snap.docs[0].data();
+          return Response.json({
+            id: doc.animeId,
+            alternatives: doc.alternatives || []
+          });
+        }
+      } catch (cacheErr) {
+        console.warn("[/api/resolve] cache lookup skipped:", cacheErr.message);
       }
     }
 
-    // Not found in cache, let's search
+    const allanimeId = await resolveAllAnimeShowId({
+      title: q,
+      malId: malId ? Number(malId) : null,
+      mode,
+    });
+
+    if (allanimeId) {
+      if (anilistId) {
+        try {
+          await adminDb.collection("AnimeData").doc(allanimeId).set({
+            animeId: allanimeId,
+            anilistId: Number(anilistId),
+            malId: malId ? Number(malId) : null,
+            title: q,
+            cachedAt: Timestamp.now(),
+            alternatives: [],
+          }, { merge: true });
+        } catch (cacheErr) {
+          console.warn("[/api/resolve] cache write skipped:", cacheErr.message);
+        }
+      }
+      return Response.json({ id: allanimeId, alternatives: [] });
+    }
+
+    // Last resort — plain title search (returns alternatives too)
     const results = await searchAnime(q, mode);
     if (!results || results.length === 0) {
       return Response.json({ error: "No results found" }, { status: 404 });

@@ -232,7 +232,7 @@ export default function AnimeRow({ items, title, isLoading = false }) {
                     {isLoading
                         ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
                         : items.map((anime, i) => (
-                            <LiftCard key={anime.id ?? i} anime={anime} index={i} />
+                            <LiftCard key={anime.animeId ?? anime.id ?? i} anime={anime} index={i} />
                         ))
                     }
                 </div>
