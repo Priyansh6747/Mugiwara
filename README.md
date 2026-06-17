@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Mugiwara 👒
 
-## Getting Started
+### Status: Under Development 🚧
+*(Don't hold your breath, or do, I'm a README, not a doctor.)*
 
-First, run the development server:
+Why did I make this? Because I have **free will**, and I decided that the world definitely needed *another* way to consume Japanese cartoons. Also, because I can. 
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Welcome to **Mugiwara**, the anime streaming site that's currently being held together by duct tape, caffeine, and pure unadulterated stubbornness. 
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Look, I'm currently binging *One Piece*, so obviously Luffy and the gang work flawlessly. Other shows? It's a gamble. If they don't work, don't @ me—I'll fix them when I eventually get around to watching them. Just kidding (mostly)... I'll fix them later. Also, I'm well aware the latency is absolute trash—chill out, I'll optimize it once I'm done procrastinating. 
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## 🚀 Features (or things I claim will work)
+- **Watch Anime**: It streams. Most of the time. Probably.
+- **Watchlist**: For all those shows you'll definitely "get to later" (we both know you won't).
+- **History**: So you can remember exactly where you left off before you fell asleep at 3 AM.
+- **Search**: Find your waifu/husbando with ease.
+- **Skip Times**: Because nobody has time for the "previously on" segment for the 400th time.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🛠️ Built With
+- **Next.js**: Because standard React is so last season.
+- **Firebase**: Keeping your data safe(ish) in the cloud.
+- **hls.js**: Making sure those moving pictures actually move in your browser.
+- **Tailwind CSS**: Because writing actual CSS is too much work.
+- **Shadcn UI**: For when you want to look professional without actually trying.
 
-## Learn More
+## 🏃 Getting Started
 
-To learn more about Next.js, take a look at the following resources:
+If you really want to run this locally for some reason:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Clone this mess**: `git clone https://github.com/your-username/mugiwara.git`
+2. **Install dependencies**: `npm install` (grab a coffee, it'll take a while).
+3. **Run the chaos**: `npm run dev` (cross your fingers).
+4. **Behold**: Open [http://localhost:3000](http://localhost:3000) and hope for the best.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📜 License
+I don't know, MIT? Just don't sue me if it breaks your heart.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+*Disclaimer: If this site causes you to become a shut-in, that's on you. Stay hydrated.*
