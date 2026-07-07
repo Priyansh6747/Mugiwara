@@ -1,6 +1,6 @@
 //! Core proxy handler.
 //!
-//! GET /proxy?t=<signed-token>
+//! GET /api/proxy?t=<signed-token>
 //!
 //! 1. Verify HMAC token  → 403 on failure
 //! 2. Fetch upstream URL with spoofed Referer + User-Agent
@@ -9,7 +9,7 @@
 
 use axum::{
     body::Body,
-    extract::Query,
+    extract::{Query, Request},
     http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
 };
@@ -34,9 +34,26 @@ fn client() -> &'static Client {
     })
 }
 
-/// The self URL of this proxy — used to rewrite m3u8 segment URLs.
-fn proxy_self() -> String {
-    std::env::var("PROXY_SELF_URL").unwrap_or_else(|_| "http://localhost:4001".into())
+/// Derive the proxy's own public base URL from the incoming request headers.
+///
+/// nginx sets `X-Forwarded-Proto` (https) and the `Host` header is always
+/// present, so this works with zero env var configuration on the VPS.
+///
+/// e.g.  https://your-vps.com
+fn proxy_self_from_request(req: &Request) -> String {
+    let headers = req.headers();
+
+    let scheme = headers
+        .get("x-forwarded-proto")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("http");
+
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("localhost");
+
+    format!("{scheme}://{host}")
 }
 
 #[derive(Deserialize)]
@@ -69,7 +86,10 @@ fn is_m3u8(content_type: &str, url: &str) -> bool {
         || url.contains(".m3u8")
 }
 
-pub async fn handle(Query(params): Query<Params>) -> Response {
+pub async fn handle(Query(params): Query<Params>, req: Request) -> Response {
+    // ── Derive self URL from live request (no env var needed) ─────────────────
+    let proxy_self = proxy_self_from_request(&req);
+
     // ── 1. Verify token ───────────────────────────────────────────────────────
     let raw_token = match params.t {
         Some(t) if !t.is_empty() => t,
@@ -84,7 +104,7 @@ pub async fn handle(Query(params): Query<Params>) -> Response {
         }
     };
 
-    tracing::debug!("proxying {}", target.url);
+    tracing::debug!("proxying {} (self={})", target.url, proxy_self);
 
     // ── 2. Fetch upstream ─────────────────────────────────────────────────────
     let upstream_res = match client()
@@ -123,7 +143,7 @@ pub async fn handle(Query(params): Query<Params>) -> Response {
             }
         };
 
-        let rewritten = m3u8::rewrite(&text, &target.url, &target.referer, &proxy_self());
+        let rewritten = m3u8::rewrite(&text, &target.url, &target.referer, &proxy_self);
 
         let mut headers = cors_headers();
         headers.insert(
