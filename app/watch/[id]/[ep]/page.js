@@ -118,7 +118,7 @@ export default function WatchPage({ params }) {
   useEffect(() => {
     setEpLoading(true);
     setEpError(null);
-    fetch(`/api/episodes/${encodeURIComponent(id)}?mode=${mode}`)
+    fetch(`/api/episodes/${encodeURIComponent(animeId)}?mode=${mode}`)
       .then((r) => r.json())
       .then((data) => {
         if (!Array.isArray(data)) throw new Error(data.error ?? "Bad response");
@@ -137,7 +137,7 @@ export default function WatchPage({ params }) {
     resumeApplied.current = false;
 
     fetch(
-      `/api/source?showId=${encodeURIComponent(id)}&ep=${encodeURIComponent(ep)}&mode=${mode}&quality=list`
+      `/api/source?showId=${encodeURIComponent(animeId)}&ep=${encodeURIComponent(ep)}&mode=${mode}&quality=list`
     )
       .then((r) => r.json())
       .then((data) => {
