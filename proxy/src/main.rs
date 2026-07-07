@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     let port: u16 = std::env::var("PROXY_PORT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(4001);
+        .unwrap_or(8000);
 
     let app = Router::new()
         .route("/api/proxy", get(proxy::handle))
